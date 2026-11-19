@@ -72,6 +72,8 @@ public class MainActivity extends Activity {
     private LinearLayout bottomPanel;
     private EditText address;
     private TextView tabsButton;
+    private TextView bookmarkButton;
+    private TextView incognitoBanner;
     private TextView reloadButton;
     private ProgressBar progress;
     private boolean loading;
@@ -102,7 +104,7 @@ public class MainActivity extends Activity {
             loading = value > 0 && value < 100;
             progress.setProgress(value);
             progress.setVisibility(loading ? View.VISIBLE : View.GONE);
-            reloadButton.setText(loading ? "✕" : "⟳");
+            reloadButton.setText(loading ? "✕\nСтоп" : "⟳\nОбновить");
             if (value >= 100) progress.setVisibility(View.GONE);
         }
 
@@ -112,6 +114,7 @@ public class MainActivity extends Activity {
             address.setText(tab.url.startsWith("data:")
                     ? "Локальная страница (HTML)" : tab.url);
             if (!tab.incognito) store.addHistory(tab.title, tab.url);
+            updateTabState();
             saveTabs();
         }
 
@@ -161,6 +164,8 @@ public class MainActivity extends Activity {
         bottomPanel = findViewById(R.id.bottomPanel);
         address = findViewById(R.id.address);
         tabsButton = findViewById(R.id.tabsButton);
+        bookmarkButton = findViewById(R.id.bookmarkButton);
+        incognitoBanner = findViewById(R.id.incognitoBanner);
         reloadButton = findViewById(R.id.reloadButton);
         progress = findViewById(R.id.progress);
 
@@ -200,6 +205,7 @@ public class MainActivity extends Activity {
         });
         findViewById(R.id.homeButton).setOnClickListener(v -> navigate(store.home()));
         tabsButton.setOnClickListener(v -> showTabs());
+        bookmarkButton.setOnClickListener(v -> toggleBookmark());
         findViewById(R.id.menuButton).setOnClickListener(v -> showMenu());
 
         restoreTabs();
@@ -255,6 +261,7 @@ public class MainActivity extends Activity {
         progress.setProgress(tab.view.getProgress());
         loading = tab.view.getProgress() > 0 && tab.view.getProgress() < 100;
         updateTabsButton();
+        updateTabState();
     }
 
     private void closeTab(int index) {
@@ -276,7 +283,29 @@ public class MainActivity extends Activity {
     }
 
     private void updateTabsButton() {
-        tabsButton.setText("▣ " + tabs.size());
+        tabsButton.setText("▣ " + tabs.size() + "\nВкладки");
+    }
+
+    private void updateTabState() {
+        Tab tab = currentTab();
+        if (tab == null) return;
+        incognitoBanner.setVisibility(tab.incognito ? View.VISIBLE : View.GONE);
+        boolean saved = store.hasBookmark(tab.url);
+        bookmarkButton.setText((saved ? "★" : "☆") + "\nЗакладка");
+        bookmarkButton.setTextColor(saved ? 0xFFFFD54F : ACCENT);
+    }
+
+    private void toggleBookmark() {
+        Tab tab = currentTab();
+        if (tab == null || tab.url.isEmpty()) return;
+        if (store.hasBookmark(tab.url)) {
+            store.removeBookmark(tab.url);
+            toast("Удалено из закладок");
+        } else {
+            store.addBookmark(tab.title, tab.url);
+            toast("Добавлено в закладки");
+        }
+        updateTabState();
     }
 
     private void goBack() {
@@ -377,7 +406,9 @@ public class MainActivity extends Activity {
             final Tab tab = tabs.get(i);
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
-            card.setBackground(round(CARD, 16));
+            GradientDrawable cardShape = round(index == current ? 0xFF302855 : CARD, 16);
+            if (index == current) cardShape.setStroke(dp(1), ACCENT);
+            card.setBackground(cardShape);
             card.setPadding(dp(14), dp(12), dp(14), dp(12));
             LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -401,11 +432,22 @@ public class MainActivity extends Activity {
             url.setPadding(0, dp(3), dp(34), 0);
             card.addView(url);
 
+            TextView meta = new TextView(this);
+            meta.setText("#" + (index + 1) + (index == current ? " · открыта" : "")
+                    + (tab.incognito ? " · инкогнито" : ""));
+            meta.setTextColor(index == current ? ACCENT : DIM);
+            meta.setTextSize(10);
+            meta.setPadding(0, dp(4), dp(34), 0);
+            card.addView(meta);
+
             TextView close = new TextView(this);
             close.setText("✕");
-            close.setTextColor(DIM);
-            close.setTextSize(16);
-            close.setPadding(dp(10), dp(4), dp(6), dp(4));
+            close.setTextColor(TEXT);
+            close.setBackground(round(0x33FFFFFF, 10));
+            close.setTextSize(14);
+            close.setGravity(Gravity.CENTER);
+            close.setWidth(dp(30));
+            close.setHeight(dp(30));
             card.addView(close, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                     Gravity.TOP));
@@ -467,43 +509,43 @@ public class MainActivity extends Activity {
         box.addView(scroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(560)));
 
-        addAction(items, "＋   Новая вкладка", v -> {
+        menuSection(items, "ВКЛАДКИ");
+        menuRow(items, "＋", "Новая вкладка", "Открыть чистую страницу", v -> {
             dialog.dismiss();
             newTab(null, false);
         });
-        addAction(items, "🕶   Новая вкладка инкогнито", v -> {
+        menuRow(items, "🕶", "Инкогнито", "Без истории, куки и кэша", v -> {
             dialog.dismiss();
             newTab(null, true);
         });
-        addAction(items, "★   Закладки", v -> {
+
+        menuSection(items, "ТЕКУЩАЯ СТРАНИЦА");
+        menuRow(items, "☆", "В закладки / убрать", "Быстрый доступ к сайту", v -> {
+            dialog.dismiss();
+            toggleBookmark();
+        });
+        menuRow(items, "★", "Закладки", "Сохранённые сайты", v -> {
             dialog.dismiss();
             showEntries(true);
         });
-        addAction(items, "◷   История", v -> {
+        menuRow(items, "◷", "История", "Недавние переходы", v -> {
             dialog.dismiss();
             showEntries(false);
         });
-        addAction(items, ">_   JS-консоль (своя, без Eruda)", v -> {
+        menuRow(items, ">_", "JS-консоль", "Выполнить код на странице", v -> {
             dialog.dismiss();
             showConsole();
         });
-        addAction(items, "✎   Редактор HTML страницы", v -> {
+        menuRow(items, "✎", "Редактор HTML", "Изменить код и применить", v -> {
             dialog.dismiss();
             showEditor();
         });
-        addAction(items, "☆   Добавить в закладки", v -> {
-            dialog.dismiss();
-            Tab tab = currentTab();
-            if (tab != null && !tab.url.isEmpty()) {
-                store.addBookmark(tab.title, tab.url);
-                toast("В закладках");
-            }
-        });
-        addAction(items, "</>   Исходный код страницы", v -> {
+        menuRow(items, "</>", "Исходный код", "Посмотреть и сохранить", v -> {
             dialog.dismiss();
             showSource();
         });
 
+        menuSection(items, "РЕЖИМ РАЗРАБОТЧИКА");
         Switch erudaSwitch = addSwitch(items, "Консоль отладки (Eruda)", store.eruda());
         erudaSwitch.setOnCheckedChangeListener((button, checked) -> {
             store.setEruda(checked);
@@ -547,11 +589,12 @@ public class MainActivity extends Activity {
             toast(checked ? "Кэш выключен" : "Кэш включён");
         });
 
-        addAction(items, "⛶   Полноэкранный режим", v -> {
+        menuSection(items, "ПРОЧЕЕ");
+        menuRow(items, "⛶", "Полноэкранный режим", "Скрыть панель и статус-бар", v -> {
             dialog.dismiss();
             toggleImmersive();
         });
-        addAction(items, "⌂   Сделать главной текущую страницу", v -> {
+        menuRow(items, "⌂", "Сделать главной", "Текущая страница при запуске", v -> {
             dialog.dismiss();
             Tab tab = currentTab();
             if (tab != null && !tab.url.isEmpty()) {
@@ -559,7 +602,7 @@ public class MainActivity extends Activity {
                 toast("Главная страница изменена");
             }
         });
-        addAction(items, "i   О Neymis Web", v -> {
+        menuRow(items, "i", "О Neymis Web", "Версия и возможности", v -> {
             dialog.dismiss();
             showAbout();
         });
@@ -1015,6 +1058,56 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void menuSection(LinearLayout parent, String text) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextColor(ACCENT_2);
+        view.setTextSize(11);
+        view.setLetterSpacing(0.12f);
+        view.setPadding(dp(8), dp(14), dp(8), dp(4));
+        parent.addView(view);
+    }
+
+    private void menuRow(LinearLayout parent, String glyph, String title, String subtitle,
+                         View.OnClickListener click) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setBackground(round(CARD, 14));
+        row.setPadding(dp(8), dp(7), dp(8), dp(7));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = dp(6);
+        parent.addView(row, params);
+
+        TextView icon = new TextView(this);
+        icon.setText(glyph);
+        icon.setTextColor(ACCENT);
+        icon.setTextSize(17);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(round(0x33B388FF, 12));
+        icon.setWidth(dp(42));
+        icon.setHeight(dp(42));
+        row.addView(icon);
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setPadding(dp(12), 0, dp(4), 0);
+        TextView name = new TextView(this);
+        name.setText(title);
+        name.setTextColor(TEXT);
+        name.setTextSize(14);
+        TextView hint = new TextView(this);
+        hint.setText(subtitle);
+        hint.setTextColor(DIM);
+        hint.setTextSize(11);
+        texts.addView(name);
+        texts.addView(hint);
+        row.addView(texts, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.setOnClickListener(click);
+    }
+
     private TextView addAction(LinearLayout parent, String text, View.OnClickListener click) {
         TextView view = new TextView(this);
         view.setText(text);
@@ -1032,8 +1125,9 @@ public class MainActivity extends Activity {
         view.setText(text);
         view.setChecked(checked);
         view.setTextColor(TEXT);
-        view.setTextSize(14);
-        view.setPadding(dp(8), dp(10), dp(8), dp(10));
+        view.setTextSize(13);
+        view.setPadding(dp(14), dp(10), dp(14), dp(10));
+        view.setBackground(round(CARD, 14));
         parent.addView(view, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return view;

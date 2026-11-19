@@ -27,6 +27,21 @@
             android:paddingRight="8dp"
             android:paddingBottom="8dp">
 
+            <TextView
+                android:id="@+id/incognitoBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                android:layout_marginRight="8dp"
+                android:layout_marginBottom="4dp"
+                android:background="@drawable/incognito_bg"
+                android:gravity="center"
+                android:padding="5dp"
+                android:text="🕶  Инкогнито · история не сохраняется"
+                android:textColor="#FFFF77B5"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
             <ProgressBar
                 android:id="@+id/progress"
                 style="?android:attr/progressBarStyleHorizontal"
@@ -46,42 +61,50 @@
                 <TextView
                     android:id="@+id/backButton"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="52dp"
                     android:layout_weight="1"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:gravity="center"
-                    android:text="←"
-                    android:textSize="22sp" />
+                    android:lineSpacingExtra="1dp"
+                    android:text="←\nНазад"
+                    android:textColor="#FFE8EAF6"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/forwardButton"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="52dp"
                     android:layout_weight="1"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:gravity="center"
-                    android:text="→"
-                    android:textSize="22sp" />
+                    android:lineSpacingExtra="1dp"
+                    android:text="→\nВперёд"
+                    android:textColor="#FFE8EAF6"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/reloadButton"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="52dp"
                     android:layout_weight="1"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:gravity="center"
-                    android:text="⟳"
-                    android:textSize="22sp" />
+                    android:lineSpacingExtra="1dp"
+                    android:text="⟳\nОбновить"
+                    android:textColor="#FFE8EAF6"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/homeButton"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="52dp"
                     android:layout_weight="1"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:gravity="center"
-                    android:text="⌂"
-                    android:textSize="22sp" />
+                    android:lineSpacingExtra="1dp"
+                    android:text="⌂\nДомой"
+                    android:textColor="#FFE8EAF6"
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -93,10 +116,10 @@
                 <EditText
                     android:id="@+id/address"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="46dp"
                     android:layout_weight="1"
                     android:background="@drawable/address_bg"
-                    android:hint="Найти или ввести адрес"
+                    android:hint="Адрес или поиск"
                     android:imeOptions="actionGo"
                     android:importantForAutofill="no"
                     android:inputType="textUri"
@@ -109,26 +132,40 @@
                     android:textSize="14sp" />
 
                 <TextView
-                    android:id="@+id/tabsButton"
-                    android:layout_width="52dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="6dp"
+                    android:id="@+id/bookmarkButton"
+                    android:layout_width="48dp"
+                    android:layout_height="46dp"
+                    android:layout_marginStart="5dp"
                     android:background="@drawable/button_bg"
                     android:gravity="center"
-                    android:text="▣ 1"
+                    android:lineSpacingExtra="1dp"
+                    android:text="☆\nЗакладка"
                     android:textColor="#FFB388FF"
-                    android:textSize="14sp" />
+                    android:textSize="9sp" />
+
+                <TextView
+                    android:id="@+id/tabsButton"
+                    android:layout_width="56dp"
+                    android:layout_height="46dp"
+                    android:layout_marginStart="5dp"
+                    android:background="@drawable/button_bg"
+                    android:gravity="center"
+                    android:lineSpacingExtra="1dp"
+                    android:text="▣ 1\nВкладки"
+                    android:textColor="#FFB388FF"
+                    android:textSize="9sp" />
 
                 <TextView
                     android:id="@+id/menuButton"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="6dp"
+                    android:layout_width="56dp"
+                    android:layout_height="46dp"
+                    android:layout_marginStart="5dp"
                     android:background="@drawable/button_bg"
                     android:gravity="center"
-                    android:text="⋮"
+                    android:lineSpacingExtra="1dp"
+                    android:text="⋮\nМеню"
                     android:textColor="#FFB388FF"
-                    android:textSize="22sp" />
+                    android:textSize="9sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
