@@ -15,7 +15,9 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -23,6 +25,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
@@ -532,6 +535,22 @@ public class MainActivity extends Activity {
             dialog.dismiss();
             showEntries(false);
         });
+        menuRow(items, "⌕", "Найти на странице", "Поиск по тексту сайта", v -> {
+            dialog.dismiss();
+            showFindInPage();
+        });
+        menuRow(items, "⇪", "Поделиться ссылкой", "Отправить адрес сайта", v -> {
+            dialog.dismiss();
+            shareUrl();
+        });
+        menuRow(items, "⇩", "Загрузки", "Файлы DownloadManager", v -> {
+            dialog.dismiss();
+            try {
+                startActivity(new Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS));
+            } catch (Exception e) {
+                toast("Не удалось открыть загрузки");
+            }
+        });
         menuRow(items, ">_", "JS-консоль", "Выполнить код на странице", v -> {
             dialog.dismiss();
             showConsole();
@@ -602,6 +621,10 @@ public class MainActivity extends Activity {
                 toast("Главная страница изменена");
             }
         });
+        menuRow(items, "🧹", "Очистить данные", "История, куки и кэш", v -> {
+            dialog.dismiss();
+            confirmClearData();
+        });
         menuRow(items, "i", "О Neymis Web", "Версия и возможности", v -> {
             dialog.dismiss();
             showAbout();
@@ -617,6 +640,99 @@ public class MainActivity extends Activity {
         dialog.show();
     }
 
+    private void showFindInPage() {
+        final Tab tab = currentTab();
+        if (tab == null) return;
+
+        Dialog dialog = new Dialog(this, R.style.SheetTheme);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setBackground(round(PANEL, 20));
+        box.setPadding(dp(16), dp(16), dp(16), dp(18));
+
+        TextView title = new TextView(this);
+        title.setText("Поиск на странице");
+        title.setTextColor(TEXT);
+        title.setTextSize(17);
+        box.addView(title);
+
+        final EditText field = new EditText(this);
+        field.setHint("Слово или фраза");
+        field.setTextColor(TEXT);
+        field.setHintTextColor(DIM);
+        field.setTextSize(14);
+        field.setBackground(round(CARD, 14));
+        field.setPadding(dp(12), dp(10), dp(12), dp(10));
+        box.addView(field, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        Button find = new Button(this);
+        find.setText("Найти");
+        Button next = new Button(this);
+        next.setText("Далее");
+        Button close = new Button(this);
+        close.setText("Закрыть");
+        for (Button button : new Button[]{find, next, close}) {
+            button.setTextColor(TEXT);
+            button.setBackground(round(CARD, 12));
+            buttons.addView(button, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        box.addView(buttons);
+
+        find.setOnClickListener(v -> {
+            String query = field.getText().toString();
+            if (query.trim().isEmpty()) return;
+            tab.view.findAllAsync(query, count -> toast("Найдено: " + count));
+        });
+        next.setOnClickListener(v -> tab.view.findNext(true));
+        close.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setContentView(box);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setGravity(Gravity.BOTTOM);
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.show();
+    }
+
+    private void shareUrl() {
+        Tab tab = currentTab();
+        if (tab == null || tab.url.isEmpty()) return;
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TEXT, tab.url);
+        try {
+            startActivity(Intent.createChooser(intent, "Поделиться ссылкой"));
+        } catch (Exception e) {
+            toast("Не удалось поделиться");
+        }
+    }
+
+    private void confirmClearData() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Очистить данные?")
+                .setMessage("История, куки и кэш всех вкладок будут удалены. Закладки останутся.")
+                .setPositiveButton("Очистить", (dialog, which) -> {
+                    store.clearHistory();
+                    for (Tab tab : tabs) {
+                        tab.view.clearCache(true);
+                        tab.view.clearHistory();
+                    }
+                    try {
+                        CookieManager.getInstance().removeAllCookies(null);
+                    } catch (Throwable ignored) {
+                    }
+                    toast("Данные очищены");
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
     private void showEntries(final boolean bookmarks) {
         Dialog dialog = new Dialog(this, R.style.FullDialogTheme);
         LinearLayout outer = new LinearLayout(this);
@@ -628,8 +744,19 @@ public class MainActivity extends Activity {
         title.setText(bookmarks ? "Закладки" : "История");
         title.setTextColor(TEXT);
         title.setTextSize(20);
-        title.setPadding(dp(6), dp(6), dp(6), dp(14));
+        title.setPadding(dp(6), dp(6), dp(6), dp(10));
         outer.addView(title);
+
+        EditText search = new EditText(this);
+        search.setHint("Поиск по списку");
+        search.setTextColor(TEXT);
+        search.setHintTextColor(DIM);
+        search.setTextSize(13);
+        search.setSingleLine(true);
+        search.setBackground(round(CARD, 14));
+        search.setPadding(dp(12), dp(10), dp(12), dp(10));
+        outer.addView(search, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         ScrollView scroll = new ScrollView(this);
         LinearLayout list = new LinearLayout(this);
@@ -687,12 +814,34 @@ public class MainActivity extends Activity {
                 showEntries(bookmarks);
             });
 
+            line.setTag((entry.title == null ? "" : entry.title) + " " + entry.url);
             line.setOnClickListener(v -> {
                 dialog.dismiss();
                 navigate(entry.url);
             });
             list.addView(line, params);
         }
+
+        search.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String query = s.toString().toLowerCase(Locale.getDefault());
+                for (int i = 0; i < list.getChildCount(); i++) {
+                    View view = list.getChildAt(i);
+                    String tag = String.valueOf(view.getTag());
+                    view.setVisibility(tag.toLowerCase(Locale.getDefault()).contains(query)
+                            ? View.VISIBLE : View.GONE);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
 
         outer.addView(scroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -934,7 +1083,7 @@ public class MainActivity extends Activity {
     }
 
     private void showAbout() {
-        showText("Neymis Web 1.0",
+        showText("Neymis Web 2.0",
                 "Браузер на базе Android System WebView (Chromium).\n\n"
                         + "• Несколько вкладок и инкогнито\n"
                         + "• Eruda-консоль, исходный код страницы, версия для ПК\n"
@@ -1026,7 +1175,9 @@ public class MainActivity extends Activity {
             JSONArray array = new JSONArray();
             for (Tab tab : tabs) {
                 JSONObject item = new JSONObject();
-                item.put("url", tab.url);
+                String url = tab.url;
+                if (url != null && url.startsWith("data:")) url = "about:blank";
+                item.put("url", url);
                 item.put("incognito", tab.incognito);
                 array.put(item);
             }
