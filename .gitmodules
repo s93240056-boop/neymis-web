@@ -1,0 +1,3 @@
+[submodule "neymis-core"]
+	path = neymis-core
+	url = https://github.com/s93240056-boop/neymis-core.git

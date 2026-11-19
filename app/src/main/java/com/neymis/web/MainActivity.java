@@ -1,5 +1,7 @@
 package com.neymis.web;
 
+import com.neymis.core.Apps;
+import com.neymis.core.Intents;
 import android.app.Activity;
 import android.app.Dialog;
 import android.app.DownloadManager;
@@ -219,6 +221,10 @@ public class MainActivity extends Activity {
             navigate(incoming.getDataString());
             address.setText(incoming.getDataString());
             address.clearFocus();
+        }
+        if (incoming != null && Intent.ACTION_SEND.equals(incoming.getAction())) {
+            String shared = incoming.getStringExtra(Intent.EXTRA_TEXT);
+            if (shared != null && !shared.trim().isEmpty()) navigate(shared.trim());
         }
     }
 
@@ -543,6 +549,14 @@ public class MainActivity extends Activity {
             dialog.dismiss();
             shareUrl();
         });
+        menuRow(items, "✦", "Спросить Codex", "Отправить страницу нейросети", v -> {
+            dialog.dismiss();
+            Tab tab = currentTab();
+            if (tab != null && !tab.url.isEmpty()) {
+                Intents.askCodex(MainActivity.this,
+                        "Посмотри эту страницу:\n" + tab.title + "\n" + tab.url);
+            }
+        });
         menuRow(items, "⇩", "Загрузки", "Файлы DownloadManager", v -> {
             dialog.dismiss();
             try {
@@ -620,6 +634,10 @@ public class MainActivity extends Activity {
                 store.setHome(tab.url);
                 toast("Главная страница изменена");
             }
+        });
+        menuRow(items, "◈", "Приложения Neymis", "Files, Tail, Codex, Web", v -> {
+            dialog.dismiss();
+            showApps();
         });
         menuRow(items, "🧹", "Очистить данные", "История, куки и кэш", v -> {
             dialog.dismiss();
@@ -1083,15 +1101,68 @@ public class MainActivity extends Activity {
         dialog.show();
     }
 
+    private void showApps() {
+        Dialog dialog = new Dialog(this, R.style.FullDialogTheme);
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        outer.setBackgroundColor(BG);
+        outer.setPadding(dp(16), dp(16), dp(16), dp(16));
+
+        TextView title = new TextView(this);
+        title.setText("Приложения Neymis");
+        title.setTextColor(TEXT);
+        title.setTextSize(20);
+        title.setPadding(dp(6), dp(6), dp(6), dp(14));
+        outer.addView(title);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        for (int i = 0; i < Apps.NAMES.length; i++) {
+            final String name = Apps.NAMES[i];
+            final String pkg = Apps.PACKAGES[i];
+            final String repo = Apps.REPOS[i];
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackground(round(CARD, 14));
+            card.setPadding(dp(14), dp(12), dp(14), dp(12));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            params.bottomMargin = dp(8);
+
+            TextView label = new TextView(this);
+            label.setText(name);
+            label.setTextColor(TEXT);
+            label.setTextSize(15);
+            card.addView(label);
+
+            TextView status = new TextView(this);
+            boolean installed = getPackageManager()
+                    .getLaunchIntentForPackage(pkg) != null;
+            status.setText(installed ? "Установлено · открыть" : "Не установлено · исходники");
+            status.setTextColor(installed ? ACCENT : DIM);
+            status.setTextSize(11);
+            card.addView(status);
+
+            card.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (!Intents.openApp(this, pkg)) Intents.openWeb(this, repo);
+            });
+            list.addView(card, params);
+        }
+        scroll.addView(list, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        outer.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        addAction(outer, "Закрыть", v -> dialog.dismiss());
+
+        dialog.setContentView(outer);
+        fullWidth(dialog);
+        dialog.show();
+    }
+
     private void showAbout() {
-        showText("Neymis Web 2.0",
-                "Браузер на базе Android System WebView (Chromium).\n\n"
-                        + "• Несколько вкладок и инкогнито\n"
-                        + "• Eruda-консоль, исходный код страницы, версия для ПК\n"
-                        + "• Закладки, история, скачивания, полноэкранный режим\n\n"
-                        + "Открытый исходный код, без рекламы и аналитики.\n"
-                        + "github.com/s93240056-boop",
-                false);
+        showText("Neymis Web 2.1", Apps.about("Neymis Web", "2.1"), false);
     }
 
     private void saveHtml(String html) {
