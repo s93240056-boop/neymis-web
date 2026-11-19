@@ -685,7 +685,8 @@ public class MainActivity extends Activity {
         find.setOnClickListener(v -> {
             String query = field.getText().toString();
             if (query.trim().isEmpty()) return;
-            tab.view.findAllAsync(query, count -> toast("Найдено: " + count));
+            tab.view.findAllAsync(query);
+            toast("Ищем: " + query);
         });
         next.setOnClickListener(v -> tab.view.findNext(true));
         close.setOnClickListener(v -> dialog.dismiss());
