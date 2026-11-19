@@ -738,7 +738,7 @@ public class MainActivity extends Activity {
         fullscreenContainer.setVisibility(View.GONE);
         if (customCallback != null) {
             try {
-                customCallback.hideCustomView();
+                customCallback.onCustomViewHidden();
             } catch (Throwable ignored) {
             }
         }
