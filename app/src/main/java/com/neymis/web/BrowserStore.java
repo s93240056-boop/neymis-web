@@ -171,12 +171,15 @@ final class BrowserStore {
 
     private static JSONArray array(List<Entry> source) {
         JSONArray array = new JSONArray();
-        for (Entry entry : source) {
-            JSONObject item = new JSONObject();
-            item.put("title", entry.title);
-            item.put("url", entry.url);
-            item.put("time", entry.time);
-            array.put(item);
+        try {
+            for (Entry entry : source) {
+                JSONObject item = new JSONObject();
+                item.put("title", entry.title);
+                item.put("url", entry.url);
+                item.put("time", entry.time);
+                array.put(item);
+            }
+        } catch (Exception ignored) {
         }
         return array;
     }
