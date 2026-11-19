@@ -2,6 +2,7 @@ package com.neymis.web;
 
 import com.neymis.core.Apps;
 import com.neymis.core.Intents;
+import com.neymis.core.NeymisPackage;
 import android.app.Activity;
 import android.app.Dialog;
 import android.app.DownloadManager;
@@ -56,6 +57,7 @@ import java.util.Locale;
 public class MainActivity extends Activity {
 
     private static final int REQ_FILE = 42;
+    private static final int REQ_IMPORT = 44;
     private static final int REQ_STORAGE = 43;
 
     private static final int BG = 0xFF121212;
@@ -345,6 +347,24 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_IMPORT) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                String raw = NeymisPackage.read(this, data.getData());
+                if (!NeymisPackage.valid(raw)) {
+                    toast("Это не файл .neymis");
+                    return;
+                }
+                String web = NeymisPackage.get(raw, NeymisPackage.WEB);
+                if (web.isEmpty()) {
+                    toast("В пакете нет данных Web");
+                    return;
+                }
+                store.fromJson(web);
+                toast("Данные Web восстановлены");
+                recreate();
+            }
+            return;
+        }
         if (requestCode == REQ_FILE) {
             if (filePathCallback != null) {
                 filePathCallback.onReceiveValue(resultCode == RESULT_OK && data != null
@@ -635,9 +655,21 @@ public class MainActivity extends Activity {
                 toast("Главная страница изменена");
             }
         });
-        menuRow(items, "◈", "Приложения Neymis", "Files, Tail, Codex, Web", v -> {
+        menuRow(items, "◈", "Приложения Neymis", "Files, Tail, Codex, Web, Hub", v -> {
             dialog.dismiss();
             showApps();
+        });
+        menuRow(items, "⇩", "Экспорт .neymis", "Закладки и история в файл", v -> {
+            dialog.dismiss();
+            exportPackage();
+        });
+        menuRow(items, "⇧", "Импорт .neymis", "Восстановить данные", v -> {
+            dialog.dismiss();
+            try {
+                startActivityForResult(NeymisPackage.openPicker(), REQ_IMPORT);
+            } catch (Exception e) {
+                toast("Не удалось открыть файл");
+            }
         });
         menuRow(items, "🧹", "Очистить данные", "История, куки и кэш", v -> {
             dialog.dismiss();
@@ -729,6 +761,17 @@ public class MainActivity extends Activity {
             startActivity(Intent.createChooser(intent, "Поделиться ссылкой"));
         } catch (Exception e) {
             toast("Не удалось поделиться");
+        }
+    }
+
+    private void exportPackage() {
+        try {
+            String raw = NeymisPackage.create("", store.toJson(), "", "");
+            Uri uri = NeymisPackage.saveToDownloads(this, raw,
+                    "neymis-web-" + System.currentTimeMillis() + ".neymis", "NeymisWeb");
+            toast(uri == null ? "Не удалось сохранить" : "Сохранено в Загрузки/NeymisWeb");
+        } catch (Exception e) {
+            toast("Ошибка экспорта: " + e.getMessage());
         }
     }
 
@@ -1162,7 +1205,7 @@ public class MainActivity extends Activity {
     }
 
     private void showAbout() {
-        showText("Neymis Web 2.1", Apps.about("Neymis Web", "2.1"), false);
+        showText("Neymis Web 2.2", Apps.about("Neymis Web", "2.2"), false);
     }
 
     private void saveHtml(String html) {

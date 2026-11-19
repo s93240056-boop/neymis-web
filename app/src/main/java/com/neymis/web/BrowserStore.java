@@ -149,4 +149,68 @@ final class BrowserStore {
     void setDev(String key, boolean value) {
         prefs.edit().putBoolean(key, value).apply();
     }
+
+    String toJson() {
+        try {
+            JSONObject root = new JSONObject();
+            root.put("format", "neymis-web-v1");
+            root.put("bookmarks", array(bookmarks));
+            root.put("history", array(history));
+            root.put("desktop", desktop());
+            root.put("eruda", eruda());
+            root.put("blockImages", blockImages());
+            root.put("jsDisabled", jsDisabled());
+            root.put("borders", showBorders());
+            root.put("noCache", noCache());
+            root.put("home", home());
+            return root.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static JSONArray array(List<Entry> source) {
+        JSONArray array = new JSONArray();
+        for (Entry entry : source) {
+            JSONObject item = new JSONObject();
+            item.put("title", entry.title);
+            item.put("url", entry.url);
+            item.put("time", entry.time);
+            array.put(item);
+        }
+        return array;
+    }
+
+    void fromJson(String raw) {
+        try {
+            JSONObject root = new JSONObject(raw);
+            bookmarks.clear();
+            history.clear();
+            readArray(root.optJSONArray("bookmarks"), bookmarks);
+            readArray(root.optJSONArray("history"), history);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putBoolean("desktop", root.optBoolean("desktop", false));
+            editor.putBoolean("eruda", root.optBoolean("eruda", false));
+            editor.putBoolean("blockImages", root.optBoolean("blockImages", false));
+            editor.putBoolean("jsDisabled", root.optBoolean("jsDisabled", false));
+            editor.putBoolean("borders", root.optBoolean("borders", false));
+            editor.putBoolean("noCache", root.optBoolean("noCache", false));
+            editor.putString("home", root.optString("home", "https://www.google.com"));
+            editor.apply();
+            save("bookmarks", bookmarks);
+            save("history", history);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void readArray(JSONArray array, List<Entry> target) {
+        if (array == null) return;
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject item = array.optJSONObject(i);
+            if (item == null) continue;
+            target.add(new Entry(item.optString("title", ""),
+                    item.optString("url", ""),
+                    item.optLong("time", 0)));
+        }
+    }
 }
