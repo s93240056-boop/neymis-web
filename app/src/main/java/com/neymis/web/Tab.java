@@ -47,16 +47,20 @@ final class Tab {
 
     private final Callback callback;
     private boolean erudaEnabled;
+    private boolean showBorders;
 
-    Tab(Context context, boolean incognito, boolean desktop, boolean eruda, Callback callback) {
+    Tab(Context context, boolean incognito, boolean desktop, boolean eruda, Callback callback,
+        boolean blockImages, boolean jsDisabled, boolean borders, boolean noCache) {
         this.incognito = incognito;
         this.callback = callback;
         this.id = System.currentTimeMillis() + (long) (Math.random() * 1000);
         this.erudaEnabled = eruda;
+        this.showBorders = borders;
 
         view = new WebView(context);
         WebSettings settings = view.getSettings();
-        settings.setJavaScriptEnabled(true);
+        settings.setJavaScriptEnabled(!jsDisabled);
+        settings.setBlockNetworkImage(blockImages);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
@@ -68,7 +72,8 @@ final class Tab {
         settings.setBuiltInZoomControls(true);
         settings.setDisplayZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setCacheMode(incognito ? WebSettings.LOAD_NO_CACHE : WebSettings.LOAD_DEFAULT);
+        settings.setCacheMode(incognito || noCache ? WebSettings.LOAD_NO_CACHE
+                : WebSettings.LOAD_DEFAULT);
         applyDesktop(desktop);
 
         view.setWebViewClient(new WebViewClient() {
@@ -84,6 +89,7 @@ final class Tab {
                 callback.onUrlChanged(Tab.this, address);
                 callback.onPageFinished(Tab.this);
                 injectEruda();
+                injectBorders();
             }
 
             @Override
@@ -145,6 +151,40 @@ final class Tab {
     void setEruda(boolean enabled) {
         erudaEnabled = enabled;
         if (enabled) injectEruda();
+    }
+
+    void applyDev(boolean blockImages, boolean jsDisabled, boolean borders, boolean noCache) {
+        WebSettings settings = view.getSettings();
+        settings.setJavaScriptEnabled(!jsDisabled);
+        settings.setBlockNetworkImage(blockImages);
+        settings.setCacheMode(incognito || noCache ? WebSettings.LOAD_NO_CACHE
+                : WebSettings.LOAD_DEFAULT);
+        showBorders = borders;
+        if (borders) injectBorders();
+    }
+
+    /** Выполняет JS в контексте страницы и возвращает результат строкой. */
+    void evaluate(String code, android.webkit.ValueCallback<String> callback) {
+        String wrapped = "(function(){try{var r=eval(" + org.json.JSONObject.quote(code)
+                + ");if(r===undefined){return ''}if(typeof r==='object'){return JSON.stringify(r)}"
+                + "return String(r)}catch(e){return '⚠ '+e.message}})()";
+        try {
+            view.evaluateJavascript(wrapped, callback);
+        } catch (Throwable error) {
+            if (callback != null) callback.onReceiveValue("⚠ " + error.getMessage());
+        }
+    }
+
+    private void injectBorders() {
+        if (!showBorders) return;
+        String script = "(function(){if(document.getElementById('__neymis_borders'))return;"
+                + "var s=document.createElement('style');s.id='__neymis_borders';"
+                + "s.innerHTML='*{outline:1px solid rgba(255,80,80,.55)!important}';"
+                + "(document.head||document.documentElement).appendChild(s)})();";
+        try {
+            view.evaluateJavascript(script, null);
+        } catch (Throwable ignored) {
+        }
     }
 
     void applyDesktop(boolean desktop) {

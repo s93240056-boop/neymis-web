@@ -91,7 +91,9 @@ public class MainActivity extends Activity {
         @Override
         public void onUrlChanged(Tab tab, String url) {
             if (tab != currentTab()) return;
-            if (!address.hasFocus()) address.setText(url);
+            if (!address.hasFocus()) {
+                address.setText(url.startsWith("data:") ? "Локальная страница (HTML)" : url);
+            }
         }
 
         @Override
@@ -107,7 +109,8 @@ public class MainActivity extends Activity {
         @Override
         public void onPageFinished(Tab tab) {
             if (tab != currentTab()) return;
-            address.setText(tab.url);
+            address.setText(tab.url.startsWith("data:")
+                    ? "Локальная страница (HTML)" : tab.url);
             if (!tab.incognito) store.addHistory(tab.title, tab.url);
             saveTabs();
         }
@@ -227,7 +230,8 @@ public class MainActivity extends Activity {
     }
 
     private void newTab(String url, boolean incognito) {
-        Tab tab = new Tab(this, incognito, store.desktop(), store.eruda(), tabCallback);
+        Tab tab = new Tab(this, incognito, store.desktop(), store.eruda(), tabCallback,
+                store.blockImages(), store.jsDisabled(), store.showBorders(), store.noCache());
         tabs.add(tab);
         switchTo(tabs.size() - 1);
         tab.load(url == null || url.isEmpty() ? store.home() : url);
@@ -247,7 +251,7 @@ public class MainActivity extends Activity {
         }
         webContainer.addView(tab.view, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        address.setText(tab.url);
+        address.setText(tab.url.startsWith("data:") ? "Локальная страница (HTML)" : tab.url);
         progress.setProgress(tab.view.getProgress());
         loading = tab.view.getProgress() > 0 && tab.view.getProgress() < 100;
         updateTabsButton();
@@ -446,7 +450,7 @@ public class MainActivity extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setBackground(round(PANEL, 20));
-        box.setPadding(dp(16), dp(14), dp(16), dp(20));
+        box.setPadding(dp(16), dp(8), dp(16), dp(12));
 
         TextView handle = new TextView(this);
         handle.setText("━━━━━");
@@ -455,23 +459,39 @@ public class MainActivity extends Activity {
         handle.setTextSize(12);
         box.addView(handle);
 
-        addAction(box, "＋   Новая вкладка", v -> {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout items = new LinearLayout(this);
+        items.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(items, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        box.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(560)));
+
+        addAction(items, "＋   Новая вкладка", v -> {
             dialog.dismiss();
             newTab(null, false);
         });
-        addAction(box, "🕶   Новая вкладка инкогнито", v -> {
+        addAction(items, "🕶   Новая вкладка инкогнито", v -> {
             dialog.dismiss();
             newTab(null, true);
         });
-        addAction(box, "★   Закладки", v -> {
+        addAction(items, "★   Закладки", v -> {
             dialog.dismiss();
             showEntries(true);
         });
-        addAction(box, "◷   История", v -> {
+        addAction(items, "◷   История", v -> {
             dialog.dismiss();
             showEntries(false);
         });
-        addAction(box, "☆   Добавить в закладки", v -> {
+        addAction(items, ">_   JS-консоль (своя, без Eruda)", v -> {
+            dialog.dismiss();
+            showConsole();
+        });
+        addAction(items, "✎   Редактор HTML страницы", v -> {
+            dialog.dismiss();
+            showEditor();
+        });
+        addAction(items, "☆   Добавить в закладки", v -> {
             dialog.dismiss();
             Tab tab = currentTab();
             if (tab != null && !tab.url.isEmpty()) {
@@ -479,19 +499,19 @@ public class MainActivity extends Activity {
                 toast("В закладках");
             }
         });
-        addAction(box, "</>   Исходный код страницы", v -> {
+        addAction(items, "</>   Исходный код страницы", v -> {
             dialog.dismiss();
             showSource();
         });
 
-        Switch erudaSwitch = addSwitch(box, "Консоль отладки (Eruda)", store.eruda());
+        Switch erudaSwitch = addSwitch(items, "Консоль отладки (Eruda)", store.eruda());
         erudaSwitch.setOnCheckedChangeListener((button, checked) -> {
             store.setEruda(checked);
             for (Tab tab : tabs) tab.setEruda(checked);
             toast(checked ? "Eruda включена" : "Eruda выключена");
         });
 
-        Switch desktopSwitch = addSwitch(box, "Версия для ПК", store.desktop());
+        Switch desktopSwitch = addSwitch(items, "Версия для ПК", store.desktop());
         desktopSwitch.setOnCheckedChangeListener((button, checked) -> {
             store.setDesktop(checked);
             for (Tab tab : tabs) tab.applyDesktop(checked);
@@ -500,11 +520,38 @@ public class MainActivity extends Activity {
             toast(checked ? "Версия для ПК" : "Мобильная версия");
         });
 
-        addAction(box, "⛶   Полноэкранный режим", v -> {
+        Switch imagesSwitch = addSwitch(items, "Без картинок", store.blockImages());
+        imagesSwitch.setOnCheckedChangeListener((button, checked) -> {
+            store.setDev("blockImages", checked);
+            applyDev(false);
+            toast(checked ? "Картинки выключены" : "Картинки включены");
+        });
+
+        Switch jsSwitch = addSwitch(items, "Без JavaScript", store.jsDisabled());
+        jsSwitch.setOnCheckedChangeListener((button, checked) -> {
+            store.setDev("jsDisabled", checked);
+            applyDev(false);
+            toast(checked ? "JavaScript выключен" : "JavaScript включён");
+        });
+
+        Switch bordersSwitch = addSwitch(items, "Границы элементов", store.showBorders());
+        bordersSwitch.setOnCheckedChangeListener((button, checked) -> {
+            store.setDev("borders", checked);
+            applyDev(checked);
+        });
+
+        Switch cacheSwitch = addSwitch(items, "Без кэша", store.noCache());
+        cacheSwitch.setOnCheckedChangeListener((button, checked) -> {
+            store.setDev("noCache", checked);
+            applyDev(false);
+            toast(checked ? "Кэш выключен" : "Кэш включён");
+        });
+
+        addAction(items, "⛶   Полноэкранный режим", v -> {
             dialog.dismiss();
             toggleImmersive();
         });
-        addAction(box, "⌂   Сделать главной текущую страницу", v -> {
+        addAction(items, "⌂   Сделать главной текущую страницу", v -> {
             dialog.dismiss();
             Tab tab = currentTab();
             if (tab != null && !tab.url.isEmpty()) {
@@ -512,7 +559,7 @@ public class MainActivity extends Activity {
                 toast("Главная страница изменена");
             }
         });
-        addAction(box, "i   О Neymis Web", v -> {
+        addAction(items, "i   О Neymis Web", v -> {
             dialog.dismiss();
             showAbout();
         });
@@ -620,9 +667,176 @@ public class MainActivity extends Activity {
         dialog.show();
     }
 
+    private void applyDev(boolean reload) {
+        for (Tab tab : tabs) {
+            tab.applyDev(store.blockImages(), store.jsDisabled(),
+                    store.showBorders(), store.noCache());
+        }
+        if (reload) {
+            Tab tab = currentTab();
+            if (tab != null) tab.reload();
+        }
+    }
+
+    private void showConsole() {
+        final Tab tab = currentTab();
+        if (tab == null) return;
+        if (store.jsDisabled()) {
+            toast("Включи JavaScript в меню");
+            return;
+        }
+
+        final Dialog dialog = new Dialog(this, R.style.FullDialogTheme);
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        outer.setBackgroundColor(BG);
+        outer.setPadding(dp(12), dp(12), dp(12), dp(12));
+
+        TextView title = new TextView(this);
+        title.setText("JS-консоль");
+        title.setTextColor(TEXT);
+        title.setTextSize(19);
+        title.setPadding(dp(6), dp(6), dp(6), dp(10));
+        outer.addView(title);
+
+        final ScrollView scroll = new ScrollView(this);
+        final TextView out = new TextView(this);
+        out.setTextColor(TEXT);
+        out.setTypeface(android.graphics.Typeface.MONOSPACE);
+        out.setTextSize(12);
+        out.setTextIsSelectable(true);
+        out.setText("Примеры: document.title\ndocument.body.innerHTML.length\nlocalStorage.getItem('key')");
+        scroll.addView(out, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        outer.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        LinearLayout inputRow = new LinearLayout(this);
+        inputRow.setOrientation(LinearLayout.HORIZONTAL);
+        final EditText input = new EditText(this);
+        input.setHint("JavaScript…");
+        input.setTextColor(TEXT);
+        input.setHintTextColor(DIM);
+        input.setTextSize(14);
+        input.setSingleLine(true);
+        input.setImeOptions(EditorInfo.IME_ACTION_GO);
+        input.setBackground(round(CARD, 14));
+        input.setPadding(dp(12), dp(10), dp(12), dp(10));
+        inputRow.addView(input, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        Button run = new Button(this);
+        run.setText("▶");
+        run.setTextColor(TEXT);
+        run.setBackground(round(ACCENT, 14));
+        run.setLayoutParams(new LinearLayout.LayoutParams(dp(52), dp(48)));
+        inputRow.addView(run);
+        outer.addView(inputRow);
+
+        addAction(outer, "Очистить вывод", v -> out.setText(""));
+        addAction(outer, "Закрыть", v -> dialog.dismiss());
+
+        Runnable execute = () -> {
+            String code = input.getText().toString();
+            if (code.trim().isEmpty()) return;
+            out.append("\n\n› " + code + "\n");
+            input.setText("");
+            tab.evaluate(code, value -> {
+                out.append(value == null ? "" : value);
+                scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+            });
+        };
+        run.setOnClickListener(v -> execute.run());
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_GO) {
+                execute.run();
+                return true;
+            }
+            return false;
+        });
+
+        dialog.setContentView(outer);
+        fullWidth(dialog);
+        dialog.show();
+    }
+
+    private void showEditor() {
+        final Tab tab = currentTab();
+        if (tab == null) return;
+        if (store.jsDisabled()) {
+            toast("Включи JavaScript в меню");
+            return;
+        }
+        tab.view.evaluateJavascript("document.documentElement.outerHTML", value -> {
+            String html = "";
+            if (value != null) {
+                try {
+                    html = String.valueOf(new JSONTokener(value).nextValue());
+                } catch (Exception ignored) {
+                    html = value;
+                }
+            }
+            showEditorDialog(tab, html);
+        });
+    }
+
+    private void showEditorDialog(final Tab tab, String html) {
+        Dialog dialog = new Dialog(this, R.style.FullDialogTheme);
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        outer.setBackgroundColor(BG);
+        outer.setPadding(dp(12), dp(12), dp(12), dp(12));
+
+        TextView title = new TextView(this);
+        title.setText("Редактор HTML");
+        title.setTextColor(TEXT);
+        title.setTextSize(19);
+        title.setPadding(dp(6), dp(6), dp(6), dp(10));
+        outer.addView(title);
+
+        final EditText code = new EditText(this);
+        code.setText(html);
+        code.setTextColor(TEXT);
+        code.setTypeface(android.graphics.Typeface.MONOSPACE);
+        code.setTextSize(12);
+        code.setGravity(Gravity.TOP);
+        code.setBackground(round(CARD, 14));
+        code.setPadding(dp(12), dp(12), dp(12), dp(12));
+        outer.addView(code, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        addAction(outer, "Применить к странице", v -> {
+            dialog.dismiss();
+            applyHtml(tab, code.getText().toString());
+        });
+        addAction(outer, "Сохранить в .html", v -> {
+            saveHtml(code.getText().toString());
+        });
+        addAction(outer, "Закрыть", v -> dialog.dismiss());
+
+        dialog.setContentView(outer);
+        fullWidth(dialog);
+        dialog.show();
+    }
+
+    private void applyHtml(Tab tab, String html) {
+        try {
+            String encoded = android.util.Base64.encodeToString(
+                    html.getBytes("UTF-8"), android.util.Base64.DEFAULT);
+            tab.load("data:text/html;base64," + encoded);
+            address.setText("Локальная страница (HTML)");
+            toast("HTML применён");
+        } catch (Exception e) {
+            toast("Ошибка: " + e.getMessage());
+        }
+    }
+
     private void showSource() {
         Tab tab = currentTab();
         if (tab == null) return;
+        if (store.jsDisabled()) {
+            toast("Включи JavaScript в меню");
+            return;
+        }
         tab.view.evaluateJavascript("document.documentElement.outerHTML", value -> {
             String html = "";
             if (value != null) {

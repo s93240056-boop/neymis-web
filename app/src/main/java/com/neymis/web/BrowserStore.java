@@ -84,7 +84,8 @@ final class BrowserStore {
     }
 
     void addHistory(String title, String url) {
-        if (url == null || url.isEmpty() || url.startsWith("about:")) return;
+        if (url == null || url.isEmpty() || url.startsWith("about:")
+                || url.startsWith("data:")) return;
         for (int i = history.size() - 1; i >= 0; i--) {
             if (history.get(i).url.equals(url)) history.remove(i);
         }
@@ -127,5 +128,25 @@ final class BrowserStore {
 
     void setHome(String url) {
         prefs.edit().putString("home", url).apply();
+    }
+
+    boolean blockImages() {
+        return prefs.getBoolean("blockImages", false);
+    }
+
+    boolean jsDisabled() {
+        return prefs.getBoolean("jsDisabled", false);
+    }
+
+    boolean showBorders() {
+        return prefs.getBoolean("borders", false);
+    }
+
+    boolean noCache() {
+        return prefs.getBoolean("noCache", false);
+    }
+
+    void setDev(String key, boolean value) {
+        prefs.edit().putBoolean(key, value).apply();
     }
 }
